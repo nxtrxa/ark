@@ -1,0 +1,7 @@
+push 1
+push 4
+push 7
+adda 0
+sub 0
+push -7
+
