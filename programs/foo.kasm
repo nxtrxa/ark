@@ -1,0 +1,6 @@
+push 1
+push 2
+add 0
+push 3
+cmp 0
+

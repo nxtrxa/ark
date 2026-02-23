@@ -1,5 +1,8 @@
 module ark;
 
+import std::io;
+import libc;
+
 enum InstType : Word_t (String inst2str) {
     INST_NOP         = "nop",
     INST_PUSH        = "push",
@@ -38,7 +41,7 @@ enum StackTrap : usz (String trap2str) {
     TRAP_PROGRAM_RUNOUT_MEMORY = "PROGRAM_RUNOUT_MEMORY",
 }
 
-enum Cmd : short (String to_str)  {
+enum CmdMode : short (String to_str)  {
     BUILD = "build",
     RUN = "run",
 }
@@ -98,19 +101,21 @@ struct Registers {
 
 struct Ark {
     Qword_t[ARK_STACK_CAP] stack;
+    Program program;
     usz stack_size;
-    Instruction[ARK_PROGRAM_CAP] program;
-    usz program_size;
-    usz program_file_size;
-    usz program_inst_count;
     usz ip;
     bool halted;
 }
 
 struct Program {
-    Instruction[ARK_PROGRAM_CAP] program;
-    usz program_file_size;
-    usz program_inst_count;
+    Instruction[ARK_PROGRAM_CAP] instructions;
+    usz size;
+    CmdMode mode;
+    String file_in;
+    String file_out;
+    usz file_size;
+    usz inst_count;
+    String[] args;
 }
 
 struct Instruction {
@@ -126,9 +131,12 @@ struct String_View {
 macro Type @reinterpret_cast(#xs) <Type> {
     return *(Type*)&&#xs;
 }
-
 macro Instruction inst(InstType it, long op) {
     return { it, (Qword_t)op };
+}
+
+macro @inst_size(#ark) {
+    return $sizeof(#ark.program.instructions[0]);
 }
 
 macro push($op) {
@@ -224,12 +232,8 @@ macro halt() {
     };
 }
 
-fn bool is_ark_bytecode_file(String fpath) {
-    String ext = fpath.split(mem, ".")[1];
-    return ext == "ark";
-}
+fn bool String.cmp(&self, String other) {
+    if (self.len != other.len) return false;
 
-fn bool is_ark_source_file(String fpath) {
-    String ext = fpath.split(mem, ".")[1];
-     return ext == "kasm";
+    return libc::memcmp(self.ptr, other.ptr, self.len) == 0;
 }

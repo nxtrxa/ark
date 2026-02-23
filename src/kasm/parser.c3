@@ -9,13 +9,6 @@ faultdef FAILED_TO_PARSE_FILE,
          FAILED_TO_PARSE_TOKENS,
          FAILED_IN_LEXER_STAGE;
 
-fn bool String.cmp(&self, String other) {
-    if (self.len != other.len) return false;
-
-    return libc::memcmp(self.ptr, other.ptr, self.len) == 0;
-}
-
-
 fn Instruction[]? parser(String source) {
     Splitter ssrc = source.tokenize("\n");
 
