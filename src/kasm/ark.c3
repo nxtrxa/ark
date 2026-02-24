@@ -60,7 +60,6 @@ load program from file
 fn void? Ark.lpff(&self @noalias, String fpath) {
     if (try f = file::open(fpath, "rb")) {
         self.program.file_size = file::get_size(fpath)!;
-        io::printfn("file size: %d\n", self.program.file_size);
         char* buf = mem::malloc(self.program.file_size);
         if (try f.read(buf[:self.program.file_size])) {
             self.lpfm(@reinterpret_cast{Instruction[]}(buf[:self.program.file_size / @inst_size(self)]))!;

@@ -44,6 +44,7 @@ enum StackTrap : usz (String trap2str) {
 enum CmdMode : short (String to_str)  {
     BUILD = "build",
     RUN = "run",
+    DKSM = "dksm",
 }
 
 typedef Qword_t = inline long;
