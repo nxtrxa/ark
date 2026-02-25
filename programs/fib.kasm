@@ -1,4 +1,5 @@
-push 1
+; 1 j;wasdasdasd
+push 1  ; 1 asasd
 push 1
 adda 0
 jmp 2

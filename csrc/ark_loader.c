@@ -7,7 +7,7 @@
  *
  * TODO: re-implement this function in C3
  */
-[[nodiscard]] extern size_t __LPFF(void* restrict PROGRAM, size_t ARK_INSTRUCTION_SIZE, size_t ARK_PROGRAM_CAP, char*  FILE_PATH ) {
+[[nodiscard]]  size_t __LPFF(void* restrict PROGRAM, size_t ARK_INSTRUCTION_SIZE, size_t ARK_PROGRAM_CAP, char*  FILE_PATH ) {
     FILE* f = fopen(FILE_PATH, "rb");
 
     if (!f) {
@@ -56,7 +56,7 @@
     return program_size;
 }
 
-[[nodiscard]] extern string_view __RFIM(char* FILE_PATH) {
+[[nodiscard]]  string_view __RFIM(char* FILE_PATH) {
     FILE* f = fopen(FILE_PATH, "r");
 
     if (!f) {
@@ -84,6 +84,6 @@
 
     return (string_view) {
         .len = program_size,
-        .str = buf,
+            .str = buf,
     };
 }

@@ -40,7 +40,10 @@ fn Instruction? parse_inst(String line) {
         case "sub":    return ark::sub();
         case "sba":    return ark::sba();
         case "div":    return ark::div();
+        case "idiv":   return ark::idiv();
         case "dva":    return ark::dva();
+        case "inc":    return ark::inc();
+        case "dec":    return ark::dec();
         // case "mov":    return ark::mov(op);
         case "cmp":    return ark::cmp();
         case "jmp":    return ark::inst(INST_JMP, op);

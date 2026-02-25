@@ -1,4 +1,4 @@
-module ark::kasm;
+module ark::kasm::lexer;
 import std;
 import libc;
 enum TokenType : const Word_t
@@ -30,19 +30,7 @@ const TokenType[256] CHAR_TO_TOKEN = {
     ['\0'] = TOKEN_EOF
 };
 
-struct Token {
-    TokenType type;
-    uint line;
-    uint column;
-    uint length;
-    union value
-    {
-        ulong int_value;
-        double float_value;
-        uint string_index;
-    }
-    String start;
-}
+
 
 // fn String? lexer(Splitter source) {
 //

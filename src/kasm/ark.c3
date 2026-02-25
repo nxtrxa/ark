@@ -34,10 +34,6 @@ fn String? Ark.rfim(&self @noalias, String fpath) {
     return FILE_NOT_FOUND~;
 }
 
-
-extern fn CULong __lpff(void* __program @noalias, CULong __ark_instruction_size, CULong __ark_program_cap, ZString __file_path) @extern("__LPFF");
-extern fn String_View __rfim(ZString fpath) @extern("__RFIM");
-
 <*
 load program into file
 *>
@@ -69,7 +65,6 @@ fn void? Ark.lpff(&self @noalias, String fpath) {
     return FAILED_TO_READ_FROM_FILE~;
 }
 
-
 fn void? Ark.compile(&self @noalias, String fpath) {
     String? src = self.rfim(fpath);
     if (catch exception = src) {
@@ -81,10 +76,8 @@ fn void? Ark.compile(&self @noalias, String fpath) {
 
 fn void Ark.run(&self) {
     uint inst_cout = 0;
-    io::printn("instruction\toperands");
     foreach (idx, inst : self.program.instructions[:ARK_INST_LIMIT]) {
         if (!self.halted && self.ip < self.program.inst_count) {
-            io::printfn("%s\t\t%s", self.program.instructions[self.ip].type.inst2str, self.program.instructions[self.ip].op);
             StackTrap st = self.execute_inst();
             inst_cout++;
             if (st != TRAP_OK) {
@@ -95,18 +88,14 @@ fn void Ark.run(&self) {
             }
         }
     }
+    self.dump_stack();
     io::printfn("[%d INSTRUCTIONS EXECUTED]", inst_cout);
 }
 
 fn StackTrap Ark.execute_inst(&self){
     if (self.ip >= self.program.inst_count) return TRAP_INVALID_INST_ACCESS;
 
-    // if (self.program.instructions[0].type != INST_ENTRY_POINT) {
-    //     return TRAP_UNKOWN_ENTRY_POINT;
-    // }
-
     Instruction inst = self.program.instructions[self.ip];
-
 
     switch (inst.type) {
         case INST_NOP:
@@ -168,7 +157,7 @@ fn StackTrap Ark.execute_inst(&self){
     }
 }
 
-fn StackTrap Ark.push (&self @noalias, Qword_t op) @inline {
+fn StackTrap Ark.push(&self @noalias, Qword_t op) @inline {
     if (self.stack_size >= ARK_STACK_CAP) return TRAP_STACK_OVERFLOW;
     self.stack[self.stack_size++] = op;
     self.ip++;
@@ -270,6 +259,23 @@ fn StackTrap Ark.sba(&self @noalias) @inline {
     return TRAP_OK;
 }
 
+fn StackTrap Ark.inc(&self @noalias) {
+    if (self.stack_size == 0) return TRAP_STACK_UNDERFLOW;
+
+    self.stack[self.stack_size - 1]++;
+    self.ip++;
+
+    return TRAP_OK;
+}
+
+fn StackTrap Ark.dec(&self @noalias) {
+    if (self.stack_size == 0) return TRAP_STACK_UNDERFLOW;
+
+    self.stack[self.stack_size - 1]--;
+    self.ip++;
+    return TRAP_OK;
+}
+
 fn StackTrap Ark.cmp(&self @noalias) @inline {
     if (self.stack_size <= 1) return TRAP_STACK_UNDERFLOW;
 
@@ -345,4 +351,161 @@ fn void Ark.dump_program(&self @noalias) {
 
     io::printfn("Program size: %d", self.program.file_size);
     io::printfn("Number of instructions: %d", self.program.inst_count);
+}
+
+macro usage() {
+    io::eprintfn("USAGE: ark [build|run] [file in] [file out] -- [args]\nif [file out] is not provided, then it will have the same name as [file in] but with a .ark extension");
+}
+
+fn void Ark.parse_args(&self @noalias, String[] args) {
+    if (args.len < 3) {
+        io::eprintn("no arguments provided\nexpected at least two arguments.");
+        usage();
+        os::exit(1);
+    }
+
+    String[] cmd_args;
+    String[] program_args;
+
+    foreach (idx, arg : args) {
+        if (arg.cmp("--")) {
+            cmd_args = args[1:(idx - 1)];
+            program_args = args[(idx + 1)..];
+            break;
+        } else {
+            cmd_args = args[1:(args.len - 1)];
+        }
+    }
+
+    self.program.mode.cast(cmd_args[0]);
+
+    switch (self.program.mode) {
+        case CmdMode.BUILD:
+        case CmdMode.RUN:
+            if (cmd_args.len > 2) {
+                self.program.file_in = cmd_args[1];
+                self.program.file_out = cmd_args[2];
+                self.program.args = program_args;
+            }
+            else if (cmd_args.len == 2) {
+
+                self.program.file_in = cmd_args[1];
+                String file_out = self.program.file_in.replace(mem, "kasm", "ark");
+                self.program.file_out = file_out;
+                self.program.args = program_args;
+            }
+        case CmdMode.DKSM:
+            if (cmd_args.len > 2) {
+                self.program.file_in = cmd_args[1];
+                self.program.file_out = cmd_args[2];
+                self.program.args = program_args;
+            }
+            else if (cmd_args.len == 2) {
+                self.program.file_in = cmd_args[1];
+                String file_out = self.program.file_in.replace(mem, "ark", "kasm");
+                self.program.file_out = file_out;
+                self.program.args = program_args;
+            }
+    }
+
+}
+
+fn int Ark.build(&self @noalias) {
+    if (!(is_ark_source_file(self.program.file_in))) {
+        io::eprintfn("invalid [file in] type: %s, expected .kasm", self.program.file_in);
+        os::exit(1);
+    }
+    if (!(is_ark_bytecode_file(self.program.file_out))) {
+        io::eprintfn("invalid [file out] type: %s, expected .ark", self.program.file_in);
+        os::exit(1);
+    }
+
+    if (catch exception = ark.compile(self.program.file_in)) {
+        io::printfn("error: %s", exception);
+        return 1;
+    }
+    if (catch exception = ark.lpif(self.program.file_out)) {
+        io::printfn("error: %s", exception);
+        return 1;
+    }
+    return 0;
+}
+
+fn int Ark.build_and_run(&self @noalias) {
+    if (!(is_ark_bytecode_file(self.program.file_out))) {
+        io::eprintfn("invalid file out type: %s, expected .ark", self.program.file_out);
+        os::exit(1);
+    }
+
+    bool flag_dump_program = false;
+
+    foreach (arg : self.program.args) {
+        if (arg.cmp("dp")) {
+            flag_dump_program = true;
+        }
+    }
+
+    if (is_ark_bytecode_file(self.program.file_in)) {
+        fault exception = @catch(ark.lpff(self.program.file_in));
+        if (exception) {
+            io::printfn("error: %s", exception);
+            return 1;
+        }
+        self.run();
+    }
+    if (is_ark_source_file(self.program.file_in)) {
+        fault exception = @catch(ark.compile(self.program.file_in));
+        if (exception) {
+            io::printfn("error: %s", exception);
+            return 1;
+        }
+        if (catch lpif_exception = ark.lpif(self.program.file_out)) {
+            io::printfn("error: %s", lpif_exception);
+            return 1;
+        }
+        self.run();
+    }
+    if (flag_dump_program) {
+        self.dump_program();
+    }
+    return 0;
+}
+
+<*
+Disassembler for KASM
+*>
+fn int Ark.dksm(&self @noalias) {
+    bool flag_print = false;
+
+    foreach (arg : self.program.args) {
+        if (arg.cmp("p")) {
+            flag_print = true;
+        }
+    }
+
+    fault lpff_exception = @catch(self.lpff(self.program.file_in));
+
+    if (lpff_exception) {
+        io::printfn("error: %s", lpff_exception);
+        return 1;
+    }
+
+    File? f = file::open(self.program.file_out, "w");
+    defer (void)f.close();
+
+    if (catch exception = f) {
+        io::printfn("error: %s", exception);
+        return 1;
+    }
+
+    foreach (inst : self.program.instructions[:self.program.inst_count]) {
+        if (flag_print) {
+            io::printfn("%s %d", inst.type.inst2str, inst.op);
+        }
+        libc::fprintf(f.file, "%s %d\n", inst.type.inst2str.zstr_copy(tmem), inst.op);
+    }
+
+    io::printfn("file %s generated\n", self.program.file_out);
+
+    return 0;
 }

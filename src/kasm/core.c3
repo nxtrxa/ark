@@ -1,6 +1,6 @@
 module ark;
 
-import std::io;
+import std;
 import libc;
 
 enum InstType : Word_t (String inst2str) {
@@ -10,12 +10,15 @@ enum InstType : Word_t (String inst2str) {
     INST_MUL         = "mul",
     INST_MLA         = "mla",
     INST_DIV         = "div",
-    INST_DVA         = "dia",
+    INST_DVA         = "dva",
+    INST_IDIV        = "idiv",
     INST_ADD         = "add",
     INST_ADDA        = "adda",
     INST_SUB         = "sub",
     INST_SBA         = "sba",
     INST_MOV         = "mov",
+    INST_INC         = "inc",
+    INST_DEV         = "dec",
     INST_CMP         = "cmp",
     INST_JMP         = "jmp",
     INST_JPE         = "jpe",
@@ -65,47 +68,51 @@ enum RegisterType : Byte_t
     VECTOR
 }
 
-struct Registers {
-    union register_value {
-        ulong u64;
-        long i64;
-        double f64;
-        Byte_t[8] bytes;
-    }
+enum RegisterName : Byte_t (String to_str) {
+    RAX = "rax",
+    RBX = "rbx",
+    RCX = "rcx",
+    RDX = "rdx",
+    RSI = "rsi",
+    RDI = "rdi",
+    RSP = "rsp",
+    RBP = "rbp",
+    RIP = "rip",
+    RTP = "rtp",
+    R8  = "r8",
+    R9  = "r9",
+    R10 = "r10",
+    R11 = "r11",
+    R12 = "r12",
+    R13 = "r13",
+    R14 = "r14",
+    R15 = "r15",
+}
 
-    struct register_metadata {
-        RegisterType type;
-        bool empty;
-        bool read_only;
-        Byte_t[5] _padding;
-    }
+union RegisterValue {
+    Qword_t i64;
+    double f64;
+    ulong u64;
+    Qword_t[2] v64;
+}
 
-    Qword_t rax;
-    Qword_t rbx;
-    Qword_t rcx;
-    Qword_t rdx;
-    Qword_t rsi;
-    Qword_t rdi;
-    Qword_t rsp;
-    Qword_t rbp;
-    Qword_t rip;
-    Qword_t rtp;
-    Dword_t r8;
-    Dword_t r9;
-    Dword_t r10;
-    Dword_t r11;
-    Dword_t r12;
-    Dword_t r13;
-    Dword_t r14;
-    Dword_t r15;
+struct Cpu {
+    Register regs;
+}
+
+struct Register {
+    RegisterName mnmonic;
+    RegisterType type;
+    RegisterValue value;
 }
 
 struct Ark {
     Qword_t[ARK_STACK_CAP] stack;
     Program program;
+    Cpu cpu;
     usz stack_size;
-    usz ip;
     bool halted;
+    usz ip;
 }
 
 struct Program {
@@ -129,6 +136,17 @@ struct String_View {
     usz len;
 }
 
+macro CmdMode.cast(&self, String arg) {
+    if (!(arg.cmp("build")) && !(arg.cmp("run")) && !(arg.cmp("dksm"))) {
+        io::eprintfn("invalid mode: %s\n", arg);
+        usage();
+        os::exit(1);
+    }
+    if (arg == "build") *self = CmdMode.BUILD;
+    if (arg == "run") *self = CmdMode.RUN;
+    if (arg == "dksm") *self = CmdMode.DKSM;
+}
+
 macro Type @reinterpret_cast(#xs) <Type> {
     return *(Type*)&&#xs;
 }
@@ -139,6 +157,8 @@ macro Instruction inst(InstType it, long op) {
 macro @inst_size(#ark) {
     return $sizeof(#ark.program.instructions[0]);
 }
+
+// Macro for the instruction set
 
 macro push($op) {
     return (Instruction) {
@@ -201,6 +221,24 @@ macro dva() {
     };
 }
 
+macro idiv() {
+    return (Instruction) {
+        .type = INST_IDIV,
+    };
+}
+
+macro inc() {
+    return (Instruction) {
+        .type = INST_INC,
+    };
+}
+
+macro ec() {
+    return (Instruction) {
+        .type = INST_DEV,
+    };
+}
+
 macro cmp() {
     return (Instruction) {
         .type = INST_CMP,
@@ -233,8 +271,28 @@ macro halt() {
     };
 }
 
+// Helper function
+
+fn bool is_ark_bytecode_file(String fpath) {
+    if (fpath.ends_with(".ark")) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+fn bool is_ark_source_file(String fpath) {
+    if (fpath.ends_with(".kasm")) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
 fn bool String.cmp(&self, String other) {
     if (self.len != other.len) return false;
 
     return libc::memcmp(self.ptr, other.ptr, self.len) == 0;
+
 }
+

@@ -1,0 +1,4 @@
+push 1
+push 1
+adda 0
+jmp 2
